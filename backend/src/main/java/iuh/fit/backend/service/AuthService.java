@@ -1,5 +1,7 @@
 package iuh.fit.backend.service;
 
+import iuh.fit.backend.request.LoginRequest;
+import iuh.fit.backend.response.AuthResponse;
 import iuh.fit.backend.response.SignupRequest;
 
 /**
@@ -8,5 +10,7 @@ import iuh.fit.backend.response.SignupRequest;
  * @description
  */
 public interface AuthService {
-    String createUser(SignupRequest req);
+    void sentLoginOtp(String email) throws Exception;
+    String createUser(SignupRequest req) throws Exception;
+    AuthResponse signing(LoginRequest req);
 }

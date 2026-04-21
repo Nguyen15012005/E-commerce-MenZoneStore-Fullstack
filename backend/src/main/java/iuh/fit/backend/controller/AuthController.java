@@ -1,7 +1,10 @@
 package iuh.fit.backend.controller;
 
 import iuh.fit.backend.domain.UserRole;
+import iuh.fit.backend.model.VerificationCode;
 import iuh.fit.backend.repository.UserRepository;
+import iuh.fit.backend.request.LoginRequest;
+import iuh.fit.backend.response.ApiResponse;
 import iuh.fit.backend.response.AuthResponse;
 import iuh.fit.backend.response.SignupRequest;
 import iuh.fit.backend.service.AuthService;
@@ -25,8 +28,9 @@ public class AuthController {
 
     private final UserRepository userRepository;
     private final AuthService authService;
+
     @PostMapping("/signup")
-    public ResponseEntity<AuthResponse> createUserHandler(@RequestBody SignupRequest req){
+    public ResponseEntity<AuthResponse> createUserHandler(@RequestBody SignupRequest req) throws Exception {
         String jwt = authService.createUser(req);
 
         AuthResponse res = new AuthResponse();
@@ -35,5 +39,23 @@ public class AuthController {
         res.setRole(UserRole.CUSTOMER);
 
         return ResponseEntity.ok(res);
+    }
+
+    @PostMapping("/sent/login-signup-otp")
+    public ResponseEntity<ApiResponse> sendOtpHandler(@RequestBody VerificationCode req) throws Exception {
+        authService.sentLoginOtp(req.getEmail());
+
+        ApiResponse res = new ApiResponse();
+        res.setMessage("otp sent successfully");
+
+
+        return ResponseEntity.ok(res);
+    }
+
+    @PostMapping("/signing")
+    public ResponseEntity<AuthResponse> loginHandler(@RequestBody LoginRequest req) throws Exception {
+        AuthResponse authResponse = authService.signing(req);
+
+        return ResponseEntity.ok(authResponse);
     }
 }

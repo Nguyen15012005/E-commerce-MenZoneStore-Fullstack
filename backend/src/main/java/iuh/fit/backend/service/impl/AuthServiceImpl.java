@@ -4,20 +4,29 @@ import iuh.fit.backend.config.JwtProvider;
 import iuh.fit.backend.domain.UserRole;
 import iuh.fit.backend.model.Cart;
 import iuh.fit.backend.model.User;
+import iuh.fit.backend.model.VerificationCode;
 import iuh.fit.backend.repository.CartRepository;
 import iuh.fit.backend.repository.UserRepository;
+import iuh.fit.backend.repository.VerificationCodeRepository;
+import iuh.fit.backend.request.LoginRequest;
+import iuh.fit.backend.response.AuthResponse;
 import iuh.fit.backend.response.SignupRequest;
 import iuh.fit.backend.service.AuthService;
+import iuh.fit.backend.service.EmailService;
+import iuh.fit.backend.util.OtpUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -33,9 +42,49 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final CartRepository cartRepository;
     private final JwtProvider jwtProvider;
+    private final VerificationCodeRepository verificationCodeRepository;
+    private final EmailService emailService;
+    private final CustomUserServiceImpl customUserService;
+
     @Override
-    public String createUser(SignupRequest req) {
+    public void sentLoginOtp(String email) throws Exception {
+        String SIGNING_PREFIX = "signin_";
+        if (email.startsWith(SIGNING_PREFIX)) {
+            email = email.substring(SIGNING_PREFIX.length());
+            User user = userRepository.findByEmail(email);
+            if(user==null){
+                throw new Exception("User not found with provided email");
+            }
+        }
+
+        VerificationCode isExist = verificationCodeRepository.findByEmail(email);
+
+        if (isExist!=null){
+            verificationCodeRepository.delete(isExist);
+        }
+
+        String otp = OtpUtil.generateOtp();
+        VerificationCode verificationCode = new VerificationCode();
+        verificationCode.setOtp(otp);
+        verificationCode.setEmail(email);
+
+        verificationCodeRepository.save(verificationCode);
+        String subject = "Daily Store login/signup OTP";
+        String text = "Mã OTP để Đăng nhập/Đăng ký tài khoảng của bạn (Your login/signup with otp): " + otp;
+
+        emailService.sendVerificationOtpEmail(email, otp, subject, text);
+    }
+
+    @Override
+    public String createUser(SignupRequest req) throws Exception {
+
+        VerificationCode verificationCode = verificationCodeRepository.findByEmail(req.getEmail());
+        if(verificationCode==null || !verificationCode.getOtp().equals(req.getOtp())){
+            throw new Exception("Wrong otp");
+        }
+
         User user = userRepository.findByEmail(req.getEmail());
+
         if (user == null) {
             User createdUser = new User();
             createdUser.setEmail(req.getEmail());
@@ -57,5 +106,40 @@ public class AuthServiceImpl implements AuthService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         return jwtProvider.generateToken(authentication);
+    }
+
+    @Override
+    public AuthResponse signing(LoginRequest req) {
+        String username = req.getEmail();
+        String otp = req.getOtp();
+
+        Authentication authentication = authenticate(username, otp);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        String token = jwtProvider.generateToken(authentication);
+
+        AuthResponse authResponse = new AuthResponse();
+        authResponse.setJwt(token);
+        authResponse.setMessage("Login success");
+        Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
+        String roleName = authorities.isEmpty()?null:authorities.iterator().next().getAuthority();
+
+        authResponse.setRole(UserRole.valueOf(roleName));
+        return authResponse;
+    }
+
+    private Authentication authenticate(String username, String otp){
+        UserDetails userDetails = customUserService.loadUserByUsername(username);
+
+        if(userDetails == null){
+            throw new BadCredentialsException("Tên người dùng không hợp lệ (invalid username)");
+        }
+
+        VerificationCode verificationCode = verificationCodeRepository.findByEmail(username);
+        if(verificationCode==null || !verificationCode.getOtp().equals(otp)){
+            throw new BadCredentialsException("Mã OTP không hợp lệ (invalid OTP)");
+        }
+
+        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
     }
 }

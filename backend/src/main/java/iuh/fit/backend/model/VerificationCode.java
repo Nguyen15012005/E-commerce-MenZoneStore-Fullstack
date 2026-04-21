@@ -29,4 +29,5 @@ public class VerificationCode {
 
     @OneToOne
     private Seller seller;
+
 }
