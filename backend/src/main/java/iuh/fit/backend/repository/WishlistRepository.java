@@ -9,4 +9,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
  * @description
  */
 public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
+
+    Wishlist findByUserId(Long userId);
 }
