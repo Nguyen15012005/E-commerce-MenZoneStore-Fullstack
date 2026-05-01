@@ -13,5 +13,5 @@ public interface HomeCategoryService {
     HomeCategory createHomeCategory(HomeCategory homeCategory);
     List<HomeCategory> createCategories(List<HomeCategory> homeCategories);
     HomeCategory updateHomeCategory(Long id, HomeCategory homeCategory);
-    List<HomeCategory> getAllCategories();
+    List<HomeCategory> getAllHomeCategories();
 }
