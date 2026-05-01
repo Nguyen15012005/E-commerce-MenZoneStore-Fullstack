@@ -77,8 +77,9 @@ public class AppConfig {
                 CorsConfiguration cfg = new CorsConfiguration(); // Tạo config CORS
 
                 // Cho phép tất cả domain truy cập (frontend gọi API)
-                cfg.setAllowedOrigins(Collections.singletonList("*"));
+//                cfg.setAllowedOrigins(Collections.singletonList("*"));
 
+                cfg.setAllowedOriginPatterns(Collections.singletonList("*"));
                 // Cho phép tất cả method (GET, POST, PUT, DELETE...)
                 cfg.setAllowedMethods(Collections.singletonList("*"));
 
