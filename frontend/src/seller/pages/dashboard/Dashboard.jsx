@@ -104,6 +104,8 @@ const StatCard = ({ title, value, percentage, isUp, icon, sideColor }) => (
   </Card>
 );
 
+import api from "../../../config/api";
+
 const Dashboard = () => {
   const dispatch = useDispatch();
   const { report, products, orders } = useSelector((state) => state.seller);

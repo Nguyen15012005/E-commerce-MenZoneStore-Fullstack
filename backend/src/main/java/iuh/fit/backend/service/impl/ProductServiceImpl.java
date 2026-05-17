@@ -84,36 +84,48 @@ public class ProductServiceImpl implements ProductService {
         return productRepository.save(product);
     }
 
-    private int caculatorDiscountPercentage(int mrpPrice, int sellingPrice) {
-        if(mrpPrice <= 0){
-            throw new IllegalArgumentException("MRP price must be greater than 0");
+    @Override
+    public Product updateProduct(Long productId, Product product) throws ProductException {
+        Product existingProduct = findProductById(productId);
+
+        if (product.getTitle() != null) existingProduct.setTitle(product.getTitle());
+        if (product.getDescription() != null) existingProduct.setDescription(product.getDescription());
+        if (product.getMrpPrice() != null) existingProduct.setMrpPrice(product.getMrpPrice());
+        if (product.getSellingPrice() != null) existingProduct.setSellingPrice(product.getSellingPrice());
+        if (product.getQuantity() != null) existingProduct.setQuantity(product.getQuantity());
+        if (product.getColor() != null) existingProduct.setColor(product.getColor());
+        if (product.getImages() != null && !product.getImages().isEmpty()) existingProduct.setImages(product.getImages());
+        if (product.getSizes() != null) existingProduct.setSizes(product.getSizes());
+
+        // Cập nhật danh mục nếu có
+        if (product.getCategory() != null && product.getCategory().getCategoryId() != null) {
+            Category newCategory = categoryRepository.findByCategoryId(product.getCategory().getCategoryId());
+            if (newCategory != null) {
+                existingProduct.setCategory(newCategory);
+            }
         }
+        
+        // Tự động tính lại phần trăm giảm giá nếu có thay đổi về giá
+        if (existingProduct.getMrpPrice() != null && existingProduct.getSellingPrice() != null && existingProduct.getMrpPrice() > 0) {
+            existingProduct.setDiscountPercent(caculatorDiscountPercentage(existingProduct.getMrpPrice(), existingProduct.getSellingPrice()));
+        }
+
+        return productRepository.save(existingProduct);
+    }
+
+    private int caculatorDiscountPercentage(Integer mrpPrice, Integer sellingPrice) {
+        if (mrpPrice == null || mrpPrice <= 0) return 0;
+        if (sellingPrice == null) return 0;
+        
         double discount = mrpPrice - sellingPrice;
         double discountPercentage = (discount / mrpPrice) * 100;
-        return (int) discountPercentage;
+        return (int) Math.max(0, discountPercentage);
     }
 
     @Override
     public void deleteProduct(Long productId) throws ProductException {
         Product product = findProductById(productId);
         productRepository.delete(product);
-    }
-
-    @Override
-    public Product updateProduct(Long productId, Product product) throws ProductException {
-        Product existingProduct = findProductById(productId);
-
-        existingProduct.setTitle(product.getTitle());
-        existingProduct.setDescription(product.getDescription());
-        existingProduct.setMrpPrice(product.getMrpPrice());
-        existingProduct.setSellingPrice(product.getSellingPrice());
-        existingProduct.setDiscountPercent(caculatorDiscountPercentage(product.getMrpPrice(), product.getSellingPrice()));
-        existingProduct.setQuantity(product.getQuantity());
-        existingProduct.setColor(product.getColor());
-        existingProduct.setImages(product.getImages());
-        existingProduct.setSizes(product.getSizes());
-
-        return productRepository.save(existingProduct);
     }
 
     @Override

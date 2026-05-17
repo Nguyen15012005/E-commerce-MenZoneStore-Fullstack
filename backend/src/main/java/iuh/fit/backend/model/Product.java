@@ -27,20 +27,21 @@ public class Product {
 
     private String description;
 
-    private int mrpPrice;
+    private Integer mrpPrice;
 
-    private int sellingPrice;
+    private Integer sellingPrice;
 
-    private int discountPercent;
+    private Integer discountPercent;
 
-    private int quantity;
+    private Integer quantity;
 
     private String color;
 
     @ElementCollection  //khi có 1 list danh sách mà không cần tạo entity thì dùng cái nay => nó sẽ tạo ra một bảng phụ để lưu
+    @Column(columnDefinition = "MEDIUMTEXT")
     private List<String> images = new ArrayList<>();
 
-    private int numRatings;
+    private Integer numRatings;
 
     @ManyToOne
     @JsonIgnore

@@ -41,6 +41,7 @@ import {
   createSellerProduct,
   fetchSellerProducts,
   updateSellerProduct,
+  deleteSellerProduct,
 } from "../../../store/sellerSlice";
 
 const initialProducts = [
@@ -126,18 +127,21 @@ const mapApiProductToUi = (product) => {
     id: product.id,
     name: product.title || "",
     category: product.category?.categoryId || "Thời trang",
+    categoryName: product.category?.name || "Chưa phân loại",
     sku: `PRD-${product.id}`,
     price: String(product.sellingPrice || 0),
     stock,
     status: stock === 0 ? "HẾT HÀNG" : stock <= 10 ? "SẮP HẾT" : "ĐANG BÁN",
     images: Array.isArray(product.images) ? product.images : [],
-    variants: [
-      {
-        type: "Biến thể",
-        value: product.sizes || product.color || "Mặc định",
-        stock,
-      },
-    ],
+    variants: product.sizes
+      ? product.sizes.split(",").map((s) => ({ type: "Biến thể", value: s.trim(), stock }))
+      : [
+          {
+            type: "Biến thể",
+            value: product.color || "Mặc định",
+            stock,
+          },
+        ],
     description: product.description || "",
     raw: product,
   };
@@ -168,9 +172,35 @@ const ProductList = () => {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [priceRangeFilter, setPriceRangeFilter] = useState("all");
 
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get("/sellers/products");
+      // Map BE fields to FE fields
+      const mappedProducts = response.data.map((p) => ({
+        id: p.id,
+        name: p.title,
+        category: p.category?.categoryId || "general", // Mã chuẩn cho Combobox
+        categoryName: p.category?.name || "Chưa phân loại", // Tên hiển thị
+        sku: `SKU-${p.id}`,
+        price: p.sellingPrice,
+        stock: p.quantity,
+        status: getStatusInfo(p.quantity).label,
+        images: p.images || [],
+        description: p.description,
+        variants: p.sizes ? p.sizes.split(",").map(s => ({ type: "Size", value: s, stock: p.quantity })) : [],
+      }));
+      setProductList(mappedProducts);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    localStorage.setItem("seller_products_v3", JSON.stringify(productList));
-  }, [productList]);
+    fetchProducts();
+  }, []);
 
   useEffect(() => {
     dispatch(fetchSellerProducts());
@@ -187,7 +217,7 @@ const ProductList = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState({
     name: "",
-    category: "Thời trang",
+    category: "fashion",
     sku: "",
     price: "",
     stock: 0,
@@ -201,7 +231,7 @@ const ProductList = () => {
   const handleOpenAdd = () => {
     setCurrentProduct({
       name: "",
-      category: "Thời trang",
+      category: "fashion",
       sku: `SKU-${Math.floor(Math.random() * 10000)}`,
       price: "",
       stock: 0,
@@ -239,20 +269,20 @@ const ProductList = () => {
       if (updatedProduct.raw?.id) {
         try {
           const savedProduct = await dispatch(
-          updateSellerProduct({
-            productId: updatedProduct.id,
-            product: {
-              ...updatedProduct.raw,
-              title: apiProduct.title,
-              description: apiProduct.description,
-              mrpPrice: apiProduct.mrpPrice,
-              sellingPrice: apiProduct.sellingPrice,
-              quantity: apiProduct.quantity,
-              color: apiProduct.color,
-              images: apiProduct.images,
-              sizes: apiProduct.size,
-            },
-          }),
+            updateSellerProduct({
+              productId: updatedProduct.id,
+              product: {
+                ...updatedProduct.raw,
+                title: apiProduct.title,
+                description: apiProduct.description,
+                mrpPrice: apiProduct.mrpPrice,
+                sellingPrice: apiProduct.sellingPrice,
+                quantity: apiProduct.quantity,
+                color: apiProduct.color,
+                images: apiProduct.images,
+                sizes: apiProduct.size,
+              },
+            }),
           ).unwrap();
 
           setProductList((prev) =>
@@ -277,6 +307,18 @@ const ProductList = () => {
         setAddDialogOpen(false);
       } catch (error) {
         alert(error || "Không thể tạo sản phẩm.");
+      }
+    }
+  };
+
+  const handleDelete = async (productId) => {
+    if (window.confirm("Bạn có chắc chắn muốn xóa sản phẩm này?")) {
+      try {
+        await dispatch(deleteSellerProduct(productId)).unwrap();
+        setProductList((prev) => prev.filter((p) => p.id !== productId));
+        alert("Xóa sản phẩm thành công!");
+      } catch (error) {
+        alert(error || "Có lỗi xảy ra khi xóa sản phẩm.");
       }
     }
   };
@@ -336,13 +378,13 @@ const ProductList = () => {
 
   const filteredProducts = productList.filter((product) => {
     const matchesSearch =
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.sku.toLowerCase().includes(searchQuery.toLowerCase());
+      (product.name?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
+      (product.sku?.toLowerCase() || "").includes(searchQuery.toLowerCase());
     const matchesCategory =
       categoryFilter === "all" || product.category === categoryFilter;
 
     let matchesPrice = true;
-    const price = parseInt(product.price);
+    const price = Number(product.price) || 0;
     if (priceRangeFilter === "low") matchesPrice = price < 1000000;
     else if (priceRangeFilter === "mid")
       matchesPrice = price >= 1000000 && price <= 5000000;
@@ -441,10 +483,10 @@ const ProductList = () => {
             sx={{ borderRadius: "12px" }}
           >
             <MenuItem value="all">Tất cả danh mục</MenuItem>
-            <MenuItem value="Giày chạy bộ">Giày chạy bộ</MenuItem>
-            <MenuItem value="Phụ kiện số">Phụ kiện số</MenuItem>
-            <MenuItem value="Thời trang">Thời trang</MenuItem>
-            <MenuItem value="Hành lý">Hành lý</MenuItem>
+            <MenuItem value="electronics">Điện tử</MenuItem>
+            <MenuItem value="fashion">Thời trang</MenuItem>
+            <MenuItem value="home_appliances">Đồ gia dụng</MenuItem>
+            <MenuItem value="phụ kiện số">Phụ kiện số</MenuItem>
           </Select>
         </FormControl>
         <FormControl
@@ -543,6 +585,7 @@ const ProductList = () => {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
+                      gap: 1,
                       opacity: 0,
                       transition: "0.3s",
                       "&:hover": { opacity: 1 },
@@ -554,10 +597,23 @@ const ProductList = () => {
                       sx={{
                         bgcolor: "#fff",
                         color: "#111",
+                        fontSize: "0.75rem",
                         "&:hover": { bgcolor: "#f0f0f0" },
                       }}
                     >
-                      Chỉnh sửa
+                      Sửa
+                    </Button>
+                    <Button
+                      variant="contained"
+                      onClick={() => handleDelete(product.id)}
+                      sx={{
+                        bgcolor: "#e74c3c",
+                        color: "#fff",
+                        fontSize: "0.75rem",
+                        "&:hover": { bgcolor: "#c0392b" },
+                      }}
+                    >
+                      Xóa
                     </Button>
                   </Box>
                 </Box>
@@ -582,7 +638,7 @@ const ProductList = () => {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {product.category}
+                    {product.categoryName}
                   </Typography>
                   <Typography
                     variant="subtitle1"
@@ -833,10 +889,11 @@ const ProductList = () => {
                       })
                     }
                   >
-                    <MenuItem value="Giày chạy bộ">Giày chạy bộ</MenuItem>
-                    <MenuItem value="Phụ kiện số">Phụ kiện số</MenuItem>
-                    <MenuItem value="Thời trang">Thời trang</MenuItem>
-                    <MenuItem value="Hành lý">Hành lý</MenuItem>
+                    <MenuItem value="electronics">Điện tử</MenuItem>
+                    <MenuItem value="fashion">Thời trang</MenuItem>
+                    <MenuItem value="home_appliances">Đồ gia dụng</MenuItem>
+                    <MenuItem value="phụ kiện số">Phụ kiện số</MenuItem>
+                    <MenuItem value="general">Khác</MenuItem>
                   </Select>
                 </FormControl>
                 <TextField
