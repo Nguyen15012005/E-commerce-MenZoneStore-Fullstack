@@ -55,8 +55,10 @@ const SellerAuth = () => {
         otp: otp,
       });
       
-      const { jwt } = response.data;
+      const { jwt, role } = response.data;
+      localStorage.setItem("jwt", jwt);
       localStorage.setItem("seller_jwt", jwt);
+      localStorage.setItem("role", role || "SELLER");
       
       // Redirect to dashboard
       navigate("/seller");
